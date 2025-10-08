@@ -40,13 +40,26 @@ const Hero = ({ onGetStarted }: HeroProps) => {
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button 
-              variant="outline" 
+              variant="secondary" 
               size="xl"
-              onClick={() => document.getElementById('como-funciona')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => {
+                const event = new CustomEvent('openProjectSuggestion');
+                window.dispatchEvent(event);
+              }}
+              className="group"
             >
-              Saiba Mais
+              Precisa de um Projeto?
+              <Sparkles className="h-5 w-5 group-hover:scale-110 transition-transform" />
             </Button>
           </div>
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => document.getElementById('como-funciona')?.scrollIntoView({ behavior: 'smooth' })}
+            className="mt-2"
+          >
+            Saiba Mais
+          </Button>
         </div>
       </div>
     </section>
