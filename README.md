@@ -48,12 +48,13 @@ EditAI é uma plataforma brasileira inovadora que utiliza Inteligência Artifici
 
 ## 📦 Instalação e Configuração
 
-### Pré-requisitos
+### Opção 1: Com Lovable Cloud (Original)
+
+#### Pré-requisitos
 - Node.js 18+ e npm instalados - [instalar com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 - Conta no Lovable Cloud (inclusa automaticamente)
 
-### Passos de Instalação
-
+#### Passos
 1. **Clone o repositório**
 ```bash
 git clone <YOUR_GIT_URL>
@@ -80,6 +81,71 @@ npm run dev
 ```
 http://localhost:8080
 ```
+
+---
+
+### Opção 2: Self-Hosted com Ollama (DeepSeek Local) 🚀
+
+Rode completamente local com seu próprio modelo DeepSeek via Ollama!
+
+#### Pré-requisitos
+- Node.js 18+ instalado
+- [Ollama](https://ollama.ai/) instalado
+- Modelo DeepSeek baixado via Ollama
+
+#### Passos
+
+**1. Instale e configure Ollama:**
+```bash
+# Instale Ollama (visite https://ollama.ai/ para instruções)
+
+# Baixe o modelo DeepSeek
+ollama pull deepseek-r1:latest
+
+# Verifique se o modelo foi instalado
+ollama list
+
+# Inicie o servidor Ollama
+ollama serve
+```
+
+**2. Configure o Backend:**
+```bash
+cd backend
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+# Edite .env conforme necessário
+
+# Inicie o backend
+npm run dev
+```
+
+**3. Configure o Frontend:**
+```bash
+cd ..  # Volte para a raiz do projeto
+
+# Instale as dependências (se ainda não instalou)
+npm install
+
+# Configure a URL do backend
+cp .env.local.example .env.local
+# Edite .env.local e defina:
+# VITE_BACKEND_URL=http://localhost:3001
+
+# Inicie o frontend
+npm run dev
+```
+
+**4. Acesse a aplicação**
+```
+http://localhost:8080
+```
+
+📚 Para mais detalhes sobre o backend self-hosted, consulte [backend/README.md](backend/README.md)
 
 ## 🏗️ Estrutura do Projeto
 

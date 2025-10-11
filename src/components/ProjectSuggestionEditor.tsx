@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Download, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 interface ProjectSuggestionEditorProps {
   initialData: {
@@ -33,11 +32,21 @@ const ProjectSuggestionEditor = ({ initialData, onReset }: ProjectSuggestionEdit
     setIsGenerating(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', {
-        body: { projectData: formData },
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/generate-proposal-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ projectData: formData }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate PDF');
+      }
+
+      const data = await response.json();
 
       // Create a download link for the PDF
       const blob = new Blob([Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0))], { type: 'application/pdf' });
@@ -58,7 +67,7 @@ const ProjectSuggestionEditor = ({ initialData, onReset }: ProjectSuggestionEdit
       console.error('Error generating PDF:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível gerar o PDF. Tente novamente.",
+        description: error instanceof Error ? error.message : "Não foi possível gerar o PDF. Tente novamente.",
         variant: "destructive",
       });
     } finally {

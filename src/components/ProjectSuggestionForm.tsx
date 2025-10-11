@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 interface ProjectSuggestionFormProps {
   onSuggestionReceived: (data: any) => void;
@@ -21,11 +20,21 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('suggest-project', {
-        body: { editalUrl },
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/suggest-project`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ editalUrl }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate suggestion');
+      }
+
+      const data = await response.json();
 
       toast({
         title: "Sugestão Gerada!",
@@ -37,7 +46,7 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
       console.error('Error generating suggestion:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível gerar a sugestão. Tente novamente.",
+        description: error instanceof Error ? error.message : "Não foi possível gerar a sugestão. Tente novamente.",
         variant: "destructive",
       });
     } finally {

@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Loader2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 interface EditalFormProps {
   onSubmitSuccess: (data: any) => void;
@@ -26,8 +25,13 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('process-edital', {
-        body: {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/process-edital`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           editalUrl,
           projectInfo: {
             name: projectName,
@@ -35,10 +39,15 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             goals: projectGoals,
             budget,
           },
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process edital');
+      }
+
+      const data = await response.json();
 
       toast({
         title: "Sucesso!",
@@ -50,7 +59,7 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
       console.error('Error processing edital:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível processar o edital. Tente novamente.",
+        description: error instanceof Error ? error.message : "Não foi possível processar o edital. Tente novamente.",
         variant: "destructive",
       });
     } finally {
