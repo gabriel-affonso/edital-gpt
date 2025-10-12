@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, CheckCircle } from "lucide-react";
+import { Download, CheckCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface ProposalResultProps {
   data: {
@@ -11,6 +14,97 @@ interface ProposalResultProps {
 }
 
 const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
+  const { toast } = useToast();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveProposal = async () => {
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Erro",
+          description: "Você precisa estar logado para salvar a proposta.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase.from("proposals").insert({
+        user_id: user.id,
+        project_name: data.filledFields.nome_projeto || "Sem título",
+        project_summary: data.filledFields.resumo_projeto,
+        justification: data.filledFields.justificativa,
+        methodology: data.filledFields.metodologia,
+        eligibility_criteria: data.filledFields.criterios_elegibilidade,
+        estimated_budget: data.filledFields.orcamento_estimado,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso!",
+        description: "Proposta salva com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch("http://localhost:3001/api/generate-proposal-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ projectData: data.filledFields }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao gerar PDF");
+      }
+
+      const result = await response.json();
+      
+      // Convert base64 to blob
+      const base64Response = await fetch(`data:application/pdf;base64,${result.pdfBase64}`);
+      const blob = await base64Response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${data.filledFields.nome_projeto || 'projeto'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "PDF gerado!",
+        description: "O download começará em instantes.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar PDF",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Card className="p-8 shadow-xl">
@@ -45,10 +139,40 @@ const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
           ))}
         </div>
 
-        <div className="flex gap-4">
-          <Button variant="hero" size="lg" className="flex-1">
-            <Download className="h-5 w-5" />
-            Baixar PDF da Proposta
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button 
+            variant="hero" 
+            size="lg" 
+            className="flex-1"
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+          >
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Gerando PDF...
+              </>
+            ) : (
+              <>
+                <Download className="h-5 w-5" />
+                Baixar PDF
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="lg"
+            onClick={handleSaveProposal}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              "Salvar Proposta"
+            )}
           </Button>
           <Button variant="outline" size="lg" onClick={onReset}>
             Nova Proposta
