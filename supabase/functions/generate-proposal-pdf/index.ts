@@ -38,7 +38,95 @@ serve(async (req) => {
 });
 
 function generateSimplePDF(data: any): string {
-  // Simple PDF structure
+  // Escape special characters for PDF
+  const escape = (str: string) => {
+    if (!str) return '';
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/\r/g, '')
+      .replace(/\n/g, ' ');
+  };
+
+  // Wrap text into multiple lines
+  const wrapText = (text: string, maxChars: number): string[] => {
+    if (!text) return [''];
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (testLine.length > maxChars && currentLine) {
+        lines.push(escape(currentLine));
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    
+    if (currentLine) {
+      lines.push(escape(currentLine));
+    }
+
+    return lines;
+  };
+
+  // Build content stream with proper line breaks
+  const resumoLines = wrapText(data.resumo || '', 85);
+  const justificativaLines = wrapText(data.justificativa || '', 85);
+  const metodologiaLines = wrapText(data.metodologia || '', 85);
+  const criteriosLines = wrapText(data.criteriosElegibilidade || '', 85);
+  const orcamentoLines = wrapText(data.orcamento || '', 85);
+
+  let yPos = 750;
+  let contentStream = 'BT\n';
+  
+  // Title
+  contentStream += `/F1 24 Tf\n50 ${yPos} Td\n(PROPOSTA DE PROJETO) Tj\n`;
+  yPos -= 40;
+  
+  // Project Name
+  contentStream += `0 -40 Td\n/F1 18 Tf\n(${escape(data.nomeProjeto || '')}) Tj\n`;
+  yPos -= 50;
+  
+  // Resumo Executivo
+  contentStream += `0 -50 Td\n/F1 14 Tf\n(RESUMO EXECUTIVO) Tj\n`;
+  yPos -= 25;
+  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
+  resumoLines.slice(0, 8).forEach(line => {
+    contentStream += `(${line}) Tj\n0 -12 Td\n`;
+    yPos -= 12;
+  });
+  
+  yPos -= 20;
+  
+  // Justificativa
+  contentStream += `0 -20 Td\n/F1 14 Tf\n(JUSTIFICATIVA) Tj\n`;
+  yPos -= 25;
+  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
+  justificativaLines.slice(0, 8).forEach(line => {
+    contentStream += `(${line}) Tj\n0 -12 Td\n`;
+    yPos -= 12;
+  });
+  
+  yPos -= 20;
+  
+  // Metodologia
+  contentStream += `0 -20 Td\n/F1 14 Tf\n(METODOLOGIA) Tj\n`;
+  yPos -= 25;
+  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
+  metodologiaLines.slice(0, 8).forEach(line => {
+    contentStream += `(${line}) Tj\n0 -12 Td\n`;
+    yPos -= 12;
+  });
+
+  contentStream += 'ET';
+
+  const streamLength = contentStream.length;
+
+  // Build complete PDF with proper encoding
   const pdf = `%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -50,85 +138,27 @@ endobj
 << /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
 endobj
 4 0 obj
-<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>
+<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> >> >>
 endobj
 5 0 obj
-<< /Length 6 0 R >>
+<< /Length ${streamLength} >>
 stream
-BT
-/F1 24 Tf
-50 750 Td
-(PROPOSTA DE PROJETO) Tj
-0 -40 Td
-/F1 18 Tf
-(${data.nomeProjeto}) Tj
-0 -50 Td
-/F1 14 Tf
-(RESUMO EXECUTIVO) Tj
-0 -25 Td
-/F1 10 Tf
-(${wrapText(data.resumo, 80)}) Tj
-0 -60 Td
-/F1 14 Tf
-(JUSTIFICATIVA) Tj
-0 -25 Td
-/F1 10 Tf
-(${wrapText(data.justificativa, 80)}) Tj
-0 -60 Td
-/F1 14 Tf
-(METODOLOGIA) Tj
-0 -25 Td
-/F1 10 Tf
-(${wrapText(data.metodologia, 80)}) Tj
-ET
+${contentStream}
 endstream
 endobj
-6 0 obj
-${calculateStreamLength(data)}
-endobj
 xref
-0 7
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-0000000214 00000 n
-0000000304 00000 n
-0000000000 00000 n
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000214 00000 n 
+0000000340 00000 n 
 trailer
-<< /Size 7 /Root 1 0 R >>
+<< /Size 6 /Root 1 0 R >>
 startxref
-${calculateXrefOffset(data)}
+${460 + streamLength}
 %%EOF`;
 
   return pdf;
-}
-
-function wrapText(text: string, maxLength: number): string {
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
-
-  for (const word of words) {
-    if ((currentLine + word).length > maxLength) {
-      lines.push(currentLine.trim());
-      currentLine = word + ' ';
-    } else {
-      currentLine += word + ' ';
-    }
-  }
-  
-  if (currentLine) {
-    lines.push(currentLine.trim());
-  }
-
-  return lines.slice(0, 5).join('\\n');
-}
-
-function calculateStreamLength(data: any): number {
-  return 800;
-}
-
-function calculateXrefOffset(data: any): number {
-  return 1200;
 }
