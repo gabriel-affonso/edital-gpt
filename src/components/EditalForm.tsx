@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Loader2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface EditalFormProps {
   onSubmitSuccess: (data: any) => void;
@@ -25,13 +26,8 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
     setIsLoading(true);
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-      const response = await fetch(`${backendUrl}/api/process-edital`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('process-edital', {
+        body: {
           editalUrl,
           projectInfo: {
             name: projectName,
@@ -39,15 +35,16 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             goals: projectGoals,
             budget,
           },
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process edital');
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to process edital');
+      }
 
       toast({
         title: "Sucesso!",
