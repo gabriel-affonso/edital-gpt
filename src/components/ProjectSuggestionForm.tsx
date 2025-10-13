@@ -26,11 +26,16 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
       });
 
       if (error) {
+        console.error('Supabase function error:', error);
         throw error;
       }
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to generate suggestion');
+      if (!data) {
+        throw new Error('No data received from server');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
       }
 
       toast({

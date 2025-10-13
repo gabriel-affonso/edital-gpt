@@ -38,6 +38,7 @@ const ProjectSuggestionEditor = ({ initialData, onReset }: ProjectSuggestionEdit
       });
 
       if (error) {
+        console.error('Supabase function error:', error);
         throw error;
       }
 

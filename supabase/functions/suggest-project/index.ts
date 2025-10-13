@@ -128,14 +128,18 @@ Por favor, leia o conteúdo do edital nesta URL e gere uma proposta completa e p
     console.log('Project suggestion generated successfully');
 
     return new Response(
-      JSON.stringify(suggestion),
+      JSON.stringify({ ...suggestion, success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Error in suggest-project function:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        success: false
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

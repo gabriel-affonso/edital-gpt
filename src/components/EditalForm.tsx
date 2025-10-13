@@ -39,11 +39,16 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
       });
 
       if (error) {
+        console.error('Supabase function error:', error);
         throw error;
       }
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to process edital');
+      if (!data) {
+        throw new Error('No data received from server');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to process edital');
       }
 
       toast({

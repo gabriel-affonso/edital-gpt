@@ -129,9 +129,17 @@ Gere uma proposta completa para este edital.`;
 
     // Extract the tool call result
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (!toolCall) {
+      console.error('No tool call in AI response');
+      throw new Error('Failed to extract proposal data from AI response');
+    }
+    
     const filledFields = toolCall?.function?.arguments 
       ? JSON.parse(toolCall.function.arguments)
       : {};
+
+    console.log('Successfully generated proposal fields');
 
     return new Response(
       JSON.stringify({ 
@@ -146,6 +154,7 @@ Gere uma proposta completa para este edital.`;
 
   } catch (error) {
     console.error('Error in process-edital function:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',

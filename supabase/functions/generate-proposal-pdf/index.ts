@@ -25,8 +25,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in generate-proposal-pdf function:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        success: false
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
