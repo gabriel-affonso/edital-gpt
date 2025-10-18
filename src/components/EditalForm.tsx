@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { editalFormSchema, type EditalFormData } from "@/lib/validations";
 
 interface EditalFormProps {
   onSubmitSuccess: (data: any) => void;
@@ -23,6 +24,26 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate input
+    const validationResult = editalFormSchema.safeParse({
+      editalUrl,
+      projectName,
+      projectDescription,
+      projectGoals,
+      budget,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast({
+        title: "Erro de validação",
+        description: firstError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -39,7 +60,6 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
       });
 
       if (error) {
-        console.error('Supabase function error:', error);
         throw error;
       }
 
@@ -58,7 +78,6 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
 
       onSubmitSuccess(data);
     } catch (error) {
-      console.error('Error processing edital:', error);
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Não foi possível processar o edital. Tente novamente.",
@@ -85,6 +104,7 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             value={editalUrl}
             onChange={(e) => setEditalUrl(e.target.value)}
             required
+            maxLength={2048}
           />
         </div>
 
@@ -96,6 +116,8 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
             required
+            minLength={3}
+            maxLength={200}
           />
         </div>
 
@@ -108,6 +130,8 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             onChange={(e) => setProjectDescription(e.target.value)}
             required
             rows={4}
+            minLength={10}
+            maxLength={5000}
           />
         </div>
 
@@ -120,6 +144,8 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             onChange={(e) => setProjectGoals(e.target.value)}
             required
             rows={3}
+            minLength={10}
+            maxLength={2000}
           />
         </div>
 
@@ -131,6 +157,7 @@ const EditalForm = ({ onSubmitSuccess }: EditalFormProps) => {
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
             required
+            maxLength={100}
           />
         </div>
 

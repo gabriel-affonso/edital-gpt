@@ -13,10 +13,10 @@ shadow_port = 54320
 major_version = 15
 
 [functions.process-edital]
-verify_jwt = false
+verify_jwt = true
 
 [functions.suggest-project]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-proposal-pdf]
-verify_jwt = false
+verify_jwt = true

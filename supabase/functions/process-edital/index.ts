@@ -12,14 +12,52 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { editalUrl, projectInfo } = await req.json();
+    
+    // Validate input lengths
+    if (!editalUrl || editalUrl.length > 2048) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid edital URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!projectInfo?.name || projectInfo.name.length < 3 || projectInfo.name.length > 200) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid project name (must be 3-200 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!projectInfo?.description || projectInfo.description.length < 10 || projectInfo.description.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid project description (must be 10-5000 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!projectInfo?.goals || projectInfo.goals.length < 10 || projectInfo.goals.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid project goals (must be 10-2000 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Processing edital:', { editalUrl, projectInfo });
+    // Removed console.log for security
 
     // Fetch the edital content (in real scenario, would scrape or fetch the document)
     // For now, we'll simulate with a system prompt
@@ -126,7 +164,6 @@ Gere uma proposta completa para este edital.`;
     }
 
     const aiResponse = await response.json();
-    console.log('AI Response:', JSON.stringify(aiResponse, null, 2));
 
     // Extract the tool call result
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
@@ -140,7 +177,7 @@ Gere uma proposta completa para este edital.`;
       ? JSON.parse(toolCall.function.arguments)
       : {};
 
-    console.log('Successfully generated proposal fields');
+    // Successfully generated proposal fields
 
     return new Response(
       JSON.stringify({ 

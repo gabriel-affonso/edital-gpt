@@ -12,7 +12,24 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { projectData } = await req.json();
+    
+    // Validate project data
+    if (!projectData || typeof projectData !== 'object') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid project data' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     console.log('Generating PDF for project:', projectData.nomeProjeto);
 
     // Generate simple PDF content

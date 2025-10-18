@@ -12,7 +12,24 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { editalUrl } = await req.json();
+    
+    // Validate input
+    if (!editalUrl || editalUrl.length > 2048) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid edital URL (must be less than 2048 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     console.log('Processing edital URL for project suggestion:', editalUrl);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');

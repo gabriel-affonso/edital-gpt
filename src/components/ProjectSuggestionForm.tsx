@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { projectSuggestionSchema } from "@/lib/validations";
 
 interface ProjectSuggestionFormProps {
   onSuggestionReceived: (data: any) => void;
@@ -18,6 +19,20 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate input
+    const validationResult = projectSuggestionSchema.safeParse({ editalUrl });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast({
+        title: "Erro de validação",
+        description: firstError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -26,7 +41,6 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
       });
 
       if (error) {
-        console.error('Supabase function error:', error);
         throw error;
       }
 
@@ -45,7 +59,6 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
 
       onSuggestionReceived(data);
     } catch (error) {
-      console.error('Error generating suggestion:', error);
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Não foi possível gerar a sugestão. Tente novamente.",
@@ -77,6 +90,7 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
             value={editalUrl}
             onChange={(e) => setEditalUrl(e.target.value)}
             required
+            maxLength={2048}
           />
           <p className="text-xs text-muted-foreground">
             Cole o link completo do edital que deseja analisar
