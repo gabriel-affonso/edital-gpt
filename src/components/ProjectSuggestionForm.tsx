@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,9 @@ interface ProjectSuggestionFormProps {
 
 const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormProps) => {
   const [editalUrl, setEditalUrl] = useState("");
+  const [city, setCity] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [organizationType, setOrganizationType] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -21,7 +25,12 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
     e.preventDefault();
     
     // Validate input
-    const validationResult = projectSuggestionSchema.safeParse({ editalUrl });
+    const validationResult = projectSuggestionSchema.safeParse({ 
+      editalUrl, 
+      city, 
+      organizationName, 
+      organizationType 
+    });
 
     if (!validationResult.success) {
       const firstError = validationResult.error.errors[0];
@@ -37,7 +46,12 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
 
     try {
       const { data, error } = await supabase.functions.invoke('suggest-project', {
-        body: { editalUrl },
+        body: { 
+          editalUrl, 
+          city, 
+          organizationName, 
+          organizationType 
+        },
       });
 
       if (error) {
@@ -97,6 +111,58 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
           </p>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="city">Cidade de Implementação *</Label>
+          <Input
+            id="city"
+            type="text"
+            placeholder="São Paulo"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            required
+            minLength={2}
+            maxLength={100}
+          />
+          <p className="text-xs text-muted-foreground">
+            Cidade onde o projeto será implementado
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="organizationName">Nome da Organização Proponente *</Label>
+          <Input
+            id="organizationName"
+            type="text"
+            placeholder="Instituto de Pesquisa e Inovação"
+            value={organizationName}
+            onChange={(e) => setOrganizationName(e.target.value)}
+            required
+            minLength={3}
+            maxLength={200}
+          />
+          <p className="text-xs text-muted-foreground">
+            Nome completo da organização que irá implementar o projeto
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="organizationType">Tipo de Organização *</Label>
+          <Select value={organizationType} onValueChange={setOrganizationType} required>
+            <SelectTrigger id="organizationType">
+              <SelectValue placeholder="Selecione o tipo de organização" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public_institution">Instituição Pública</SelectItem>
+              <SelectItem value="public_university">Universidade Pública</SelectItem>
+              <SelectItem value="ngo">ONG</SelectItem>
+              <SelectItem value="cso">OSC (Organização da Sociedade Civil)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Tipo da organização proponente
+          </p>
+        </div>
+
         <Button 
           type="submit" 
           className="w-full" 
@@ -107,7 +173,7 @@ const ProjectSuggestionForm = ({ onSuggestionReceived }: ProjectSuggestionFormPr
           {isLoading ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" />
-              Analisando Edital...
+              Analisando Edital e Gerando Proposta...
             </>
           ) : (
             <>

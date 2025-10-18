@@ -28,6 +28,18 @@ export const projectSuggestionSchema = z.object({
     .string()
     .url({ message: "URL inválida" })
     .max(2048, { message: "URL muito longa (máximo 2048 caracteres)" }),
+  city: z
+    .string()
+    .min(2, { message: "Cidade deve ter no mínimo 2 caracteres" })
+    .max(100, { message: "Cidade deve ter no máximo 100 caracteres" }),
+  organizationName: z
+    .string()
+    .min(3, { message: "Nome da organização deve ter no mínimo 3 caracteres" })
+    .max(200, { message: "Nome da organização deve ter no máximo 200 caracteres" }),
+  organizationType: z
+    .enum(["public_institution", "public_university", "ngo", "cso"], {
+      errorMap: () => ({ message: "Selecione um tipo de organização válido" }),
+    }),
 });
 
 export const authSchema = z.object({
