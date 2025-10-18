@@ -12,7 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -23,17 +22,16 @@ serve(async (req) => {
 
     const { projectData } = await req.json();
     
-    // Validate project data
     if (!projectData || typeof projectData !== 'object') {
       return new Response(
         JSON.stringify({ error: 'Invalid project data' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log('Generating PDF for project:', projectData.nomeProjeto);
 
-    // Generate simple PDF content
-    const pdfContent = generateSimplePDF(projectData);
+    console.log('Generating professional PDF for project:', projectData.nomeProjeto);
+
+    const pdfContent = generateProfessionalPDF(projectData);
     const base64Pdf = btoa(pdfContent);
 
     return new Response(
@@ -43,7 +41,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in generate-proposal-pdf function:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Internal server error',
@@ -54,8 +51,7 @@ serve(async (req) => {
   }
 });
 
-function generateSimplePDF(data: any): string {
-  // Escape special characters for PDF
+function generateProfessionalPDF(data: any): string {
   const escape = (str: string) => {
     if (!str) return '';
     return str
@@ -66,7 +62,6 @@ function generateSimplePDF(data: any): string {
       .replace(/\n/g, ' ');
   };
 
-  // Wrap text into multiple lines
   const wrapText = (text: string, maxChars: number): string[] => {
     if (!text) return [''];
     const words = text.split(' ');
@@ -90,60 +85,65 @@ function generateSimplePDF(data: any): string {
     return lines;
   };
 
-  // Build content stream with proper line breaks
-  const resumoLines = wrapText(data.resumo || '', 85);
-  const justificativaLines = wrapText(data.justificativa || '', 85);
-  const metodologiaLines = wrapText(data.metodologia || '', 85);
-  const criteriosLines = wrapText(data.criteriosElegibilidade || '', 85);
-  const orcamentoLines = wrapText(data.orcamento || '', 85);
+  const addSection = (title: string, content: string, maxLines: number = 1000): string => {
+    const lines = wrapText(content, 85);
+    let section = `0 -30 Td\n/F2 14 Tf\n(${escape(title)}) Tj\n`;
+    section += `0 -20 Td\n/F1 10 Tf\n`;
+    
+    lines.slice(0, maxLines).forEach((line, index) => {
+      section += `(${line}) Tj\n0 -14 Td\n`;
+    });
+    
+    return section;
+  };
 
-  let yPos = 750;
+  const currentDate = new Date().toLocaleDateString('pt-BR');
+  
   let contentStream = 'BT\n';
   
-  // Title
-  contentStream += `/F1 24 Tf\n50 ${yPos} Td\n(PROPOSTA DE PROJETO) Tj\n`;
-  yPos -= 40;
+  // Header with logo placeholder
+  contentStream += `/F2 28 Tf\n50 750 Td\n(PROPOSTA DE PROJETO) Tj\n`;
+  contentStream += `0 -30 Td\n/F1 12 Tf\n(${escape(data.organizationName || '')}) Tj\n`;
+  contentStream += `0 -16 Td\n(${escape(data.city || '')} - ${currentDate}) Tj\n`;
   
-  // Project Name
-  contentStream += `0 -40 Td\n/F1 18 Tf\n(${escape(data.nomeProjeto || '')}) Tj\n`;
-  yPos -= 50;
+  // Project Title
+  contentStream += `0 -40 Td\n/F2 20 Tf\n(${escape(data.nomeProjeto || 'Projeto')}) Tj\n`;
   
-  // Resumo Executivo
-  contentStream += `0 -50 Td\n/F1 14 Tf\n(RESUMO EXECUTIVO) Tj\n`;
-  yPos -= 25;
-  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
-  resumoLines.slice(0, 8).forEach(line => {
-    contentStream += `(${line}) Tj\n0 -12 Td\n`;
-    yPos -= 12;
-  });
+  // Organization Info
+  contentStream += `0 -30 Td\n/F1 10 Tf\n(Organizacao: ${escape(data.organizationName || '')}) Tj\n`;
+  contentStream += `0 -14 Td\n(Tipo: ${escape(data.organizationType || '')}) Tj\n`;
+  contentStream += `0 -14 Td\n(Cidade: ${escape(data.city || '')}) Tj\n`;
   
-  yPos -= 20;
+  // Executive Summary
+  contentStream += addSection('1. RESUMO EXECUTIVO', data.resumo || '');
   
-  // Justificativa
-  contentStream += `0 -20 Td\n/F1 14 Tf\n(JUSTIFICATIVA) Tj\n`;
-  yPos -= 25;
-  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
-  justificativaLines.slice(0, 8).forEach(line => {
-    contentStream += `(${line}) Tj\n0 -12 Td\n`;
-    yPos -= 12;
-  });
+  // Justification
+  contentStream += addSection('2. JUSTIFICATIVA', data.justificativa || '');
   
-  yPos -= 20;
+  // Methodology
+  contentStream += addSection('3. METODOLOGIA', data.metodologia || '');
   
-  // Metodologia
-  contentStream += `0 -20 Td\n/F1 14 Tf\n(METODOLOGIA) Tj\n`;
-  yPos -= 25;
-  contentStream += `0 -25 Td\n/F1 10 Tf\n`;
-  metodologiaLines.slice(0, 8).forEach(line => {
-    contentStream += `(${line}) Tj\n0 -12 Td\n`;
-    yPos -= 12;
-  });
-
+  // Budget
+  contentStream += addSection('4. ORCAMENTO', data.orcamento || '');
+  
+  // Eligibility Criteria (if exists)
+  if (data.criteriosElegibilidade) {
+    contentStream += addSection('5. CRITERIOS DE ELEGIBILIDADE', data.criteriosElegibilidade);
+  }
+  
+  // Signature Section
+  contentStream += `0 -60 Td\n/F2 12 Tf\n(ASSINATURAS) Tj\n`;
+  contentStream += `0 -40 Td\n/F1 10 Tf\n(_____________________________________________) Tj\n`;
+  contentStream += `0 -14 Td\n(Nome do Responsavel Legal) Tj\n`;
+  contentStream += `0 -14 Td\n(${escape(data.organizationName || '')}) Tj\n`;
+  contentStream += `0 -30 Td\n(_____________________________________________) Tj\n`;
+  contentStream += `0 -14 Td\n(Coordenador do Projeto) Tj\n`;
+  contentStream += `0 -30 Td\n(Data: ___/___/______) Tj\n`;
+  
   contentStream += 'ET';
 
   const streamLength = contentStream.length;
 
-  // Build complete PDF with proper encoding
   const pdf = `%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -155,7 +155,7 @@ endobj
 << /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
 endobj
 4 0 obj
-<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> >> >>
+<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> >> >>
 endobj
 5 0 obj
 << /Length ${streamLength} >>
@@ -170,11 +170,11 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000214 00000 n 
-0000000340 00000 n 
+0000000380 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-${460 + streamLength}
+${520 + streamLength}
 %%EOF`;
 
   return pdf;

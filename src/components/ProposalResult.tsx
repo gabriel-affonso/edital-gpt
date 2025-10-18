@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, CheckCircle, Loader2 } from "lucide-react";
+import { Download, CheckCircle, Loader2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -15,7 +15,8 @@ interface ProposalResultProps {
 
 const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
   const { toast } = useToast();
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const [isDownloadingWord, setIsDownloadingWord] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveProposal = async () => {
@@ -60,31 +61,26 @@ const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
   };
 
   const handleDownloadPDF = async () => {
-    setIsDownloading(true);
+    setIsDownloadingPDF(true);
     try {
-      const response = await fetch("http://localhost:3001/api/generate-proposal-pdf", {
-        method: "POST",
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const { data: result, error } = await supabase.functions.invoke('generate-proposal-pdf', {
+        body: { projectData: data.filledFields },
         headers: {
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ projectData: data.filledFields }),
       });
 
-      if (!response.ok) {
-        throw new Error("Erro ao gerar PDF");
-      }
-
-      const result = await response.json();
+      if (error) throw error;
       
-      // Convert base64 to blob
-      const base64Response = await fetch(`data:application/pdf;base64,${result.pdfBase64}`);
+      const base64Response = await fetch(`data:application/pdf;base64,${result.pdf}`);
       const blob = await base64Response.blob();
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `proposta-${data.filledFields.nome_projeto || 'projeto'}.pdf`;
+      a.download = `proposta-${data.filledFields.nomeProjeto || 'projeto'}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -92,7 +88,7 @@ const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
 
       toast({
         title: "PDF gerado!",
-        description: "O download começará em instantes.",
+        description: "Download iniciado com sucesso.",
       });
     } catch (error: any) {
       toast({
@@ -101,7 +97,48 @@ const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
         variant: "destructive",
       });
     } finally {
-      setIsDownloading(false);
+      setIsDownloadingPDF(false);
+    }
+  };
+
+  const handleDownloadWord = async () => {
+    setIsDownloadingWord(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const { data: result, error } = await supabase.functions.invoke('generate-proposal-docx', {
+        body: { projectData: data.filledFields },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      const htmlContent = atob(result.html);
+      const blob = new Blob([htmlContent], { type: 'application/msword' });
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${data.filledFields.nomeProjeto || 'projeto'}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Word gerado!",
+        description: "Download iniciado com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar Word",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingWord(false);
     }
   };
 
@@ -139,44 +176,68 @@ const ProposalResult = ({ data, onReset }: ProposalResultProps) => {
           ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            variant="hero" 
-            size="lg" 
-            className="flex-1"
-            onClick={handleDownloadPDF}
-            disabled={isDownloading}
-          >
-            {isDownloading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Gerando PDF...
-              </>
-            ) : (
-              <>
-                <Download className="h-5 w-5" />
-                Baixar PDF
-              </>
-            )}
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="lg"
-            onClick={handleSaveProposal}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              "Salvar Proposta"
-            )}
-          </Button>
-          <Button variant="outline" size="lg" onClick={onReset}>
-            Nova Proposta
-          </Button>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button 
+              variant="hero" 
+              size="lg" 
+              className="flex-1"
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPDF}
+            >
+              {isDownloadingPDF ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Gerando PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5" />
+                  Baixar PDF
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="lg"
+              className="flex-1"
+              onClick={handleDownloadWord}
+              disabled={isDownloadingWord}
+            >
+              {isDownloadingWord ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Gerando Word...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-5 w-5" />
+                  Baixar Word
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button 
+              variant="default" 
+              size="lg"
+              className="flex-1"
+              onClick={handleSaveProposal}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar Proposta"
+              )}
+            </Button>
+            <Button variant="outline" size="lg" className="flex-1" onClick={onReset}>
+              Nova Proposta
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
