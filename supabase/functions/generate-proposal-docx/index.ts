@@ -52,6 +52,35 @@ serve(async (req) => {
 });
 
 function generateWordHTML(data: any): string {
+  const cleanText = (str: string): string => {
+    if (!str) return '';
+    
+    // Normalize Unicode characters and clean markdown
+    let cleaned = str
+      // Remove markdown headers but preserve structure
+      .replace(/#{1,6}\s*/g, '')
+      // Keep bold and italic for Word
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Replace smart quotes
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      // Replace dashes
+      .replace(/[\u2013\u2014]/g, '-')
+      // Replace ellipsis
+      .replace(/\u2026/g, '...')
+      // Replace non-breaking space
+      .replace(/\u00A0/g, ' ')
+      // Replace bullets
+      .replace(/[\u2022\u2023\u25E6\u2043]/g, '-')
+      // Preserve line breaks for paragraphs
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    
+    return cleaned;
+  };
+
   const currentDate = new Date().toLocaleDateString('pt-BR');
   
   return `<!DOCTYPE html>
@@ -162,28 +191,28 @@ function generateWordHTML(data: any): string {
 
   <div class="section">
     <h3>1. RESUMO EXECUTIVO</h3>
-    <p>${data.resumo || ''}</p>
+    <p>${cleanText(data.resumo || '')}</p>
   </div>
 
   <div class="section">
     <h3>2. JUSTIFICATIVA</h3>
-    <p>${data.justificativa || ''}</p>
+    <p>${cleanText(data.justificativa || '')}</p>
   </div>
 
   <div class="section">
     <h3>3. METODOLOGIA</h3>
-    <p>${data.metodologia || ''}</p>
+    <p>${cleanText(data.metodologia || '')}</p>
   </div>
 
   <div class="section">
     <h3>4. ORÇAMENTO</h3>
-    <p>${data.orcamento || ''}</p>
+    <p>${cleanText(data.orcamento || '')}</p>
   </div>
 
   ${data.criteriosElegibilidade ? `
   <div class="section">
     <h3>5. CRITÉRIOS DE ELEGIBILIDADE</h3>
-    <p>${data.criteriosElegibilidade}</p>
+    <p>${cleanText(data.criteriosElegibilidade)}</p>
   </div>
   ` : ''}
 

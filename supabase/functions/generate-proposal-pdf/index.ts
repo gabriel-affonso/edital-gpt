@@ -52,9 +52,36 @@ serve(async (req) => {
 });
 
 function generateProfessionalPDF(data: any): string {
+  const cleanText = (str: string): string => {
+    if (!str) return '';
+    
+    // First, normalize Unicode characters to Latin1 equivalents
+    let cleaned = str
+      // Remove markdown formatting
+      .replace(/#{1,6}\s*/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      // Replace smart quotes with regular quotes
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      // Replace em-dash and en-dash
+      .replace(/[\u2013\u2014]/g, '-')
+      // Replace ellipsis
+      .replace(/\u2026/g, '...')
+      // Replace other common Unicode characters
+      .replace(/\u00A0/g, ' ') // non-breaking space
+      .replace(/[\u2022\u2023\u25E6\u2043]/g, '-') // bullets
+      // Remove any remaining non-Latin1 characters
+      .replace(/[^\x00-\xFF]/g, '');
+    
+    return cleaned;
+  };
+
   const escape = (str: string) => {
     if (!str) return '';
-    return str
+    const cleaned = cleanText(str);
+    return cleaned
       .replace(/\\/g, '\\\\')
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)')
