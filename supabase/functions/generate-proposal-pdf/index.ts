@@ -94,18 +94,28 @@ async function generateProfessionalPDF(data: any): Promise<Uint8Array> {
   };
   
   const drawText = (text: string, size: number, font: any, color = rgb(0, 0, 0)) => {
-    const lines = splitTextIntoLines(cleanText(text), contentWidth - 20, size, font);
-    
-    for (const line of lines) {
-      addNewPageIfNeeded(size + 5);
-      currentPage.drawText(line, {
-        x: margin,
-        y: yPosition,
-        size: size,
-        font: font,
-        color: color,
-      });
-      yPosition -= size + 5;
+    const normalized = cleanText(text ?? '');
+    const paragraphs = normalized.split(/\r?\n+/).filter(Boolean);
+
+    if (paragraphs.length === 0) {
+      return;
+    }
+
+    for (const para of paragraphs) {
+      const lines = splitTextIntoLines(para, contentWidth - 20, size, font);
+      for (const line of lines) {
+        addNewPageIfNeeded(size + 5);
+        currentPage.drawText(line, {
+          x: margin,
+          y: yPosition,
+          size,
+          font,
+          color,
+        });
+        yPosition -= size + 5;
+      }
+      // Extra spacing between paragraphs
+      yPosition -= 5;
     }
   };
   
@@ -127,26 +137,41 @@ async function generateProfessionalPDF(data: any): Promise<Uint8Array> {
   };
   
   const splitTextIntoLines = (text: string, maxWidth: number, fontSize: number, font: any): string[] => {
-    const words = text.split(' ');
+    const safe = (text ?? '').replace(/\r/g, '');
+    const words = safe.split(/\s+/).filter(Boolean);
     const lines: string[] = [];
     let currentLine = '';
-    
-    for (const word of words) {
+
+    for (const rawWord of words) {
+      const word = rawWord.replace(/\n/g, '');
       const testLine = currentLine ? `${currentLine} ${word}` : word;
       const width = font.widthOfTextAtSize(testLine, fontSize);
-      
+
       if (width > maxWidth && currentLine) {
         lines.push(currentLine);
         currentLine = word;
+      } else if (width > maxWidth) {
+        // Handle extremely long single words by hard-wrapping
+        let buffer = '';
+        for (const ch of word) {
+          const attempt = buffer + ch;
+          if (font.widthOfTextAtSize(attempt, fontSize) > maxWidth) {
+            if (buffer) lines.push(buffer);
+            buffer = ch;
+          } else {
+            buffer = attempt;
+          }
+        }
+        currentLine = buffer;
       } else {
         currentLine = testLine;
       }
     }
-    
+
     if (currentLine) {
       lines.push(currentLine);
     }
-    
+
     return lines;
   };
   
