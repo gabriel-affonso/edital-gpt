@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,8 +32,8 @@ serve(async (req) => {
 
     console.log('Generating professional PDF for project:', projectData.nomeProjeto);
 
-    const pdfContent = generateProfessionalPDF(projectData);
-    const base64Pdf = btoa(pdfContent);
+    const pdfBytes = await generateProfessionalPDF(projectData);
+    const base64Pdf = btoa(String.fromCharCode(...pdfBytes));
 
     return new Response(
       JSON.stringify({ pdf: base64Pdf }),
@@ -51,54 +52,91 @@ serve(async (req) => {
   }
 });
 
-function generateProfessionalPDF(data: any): string {
+async function generateProfessionalPDF(data: any): Promise<Uint8Array> {
   const cleanText = (str: string): string => {
     if (!str) return '';
     
-    // First, normalize Unicode characters to Latin1 equivalents
     let cleaned = str
-      // Remove markdown formatting
       .replace(/#{1,6}\s*/g, '')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/\*([^*]+)\*/g, '$1')
       .replace(/`([^`]+)`/g, '$1')
-      // Replace smart quotes with regular quotes
       .replace(/[\u201C\u201D]/g, '"')
       .replace(/[\u2018\u2019]/g, "'")
-      // Replace em-dash and en-dash
       .replace(/[\u2013\u2014]/g, '-')
-      // Replace ellipsis
       .replace(/\u2026/g, '...')
-      // Replace other common Unicode characters
-      .replace(/\u00A0/g, ' ') // non-breaking space
-      .replace(/[\u2022\u2023\u25E6\u2043]/g, '-') // bullets
-      // Remove any remaining non-Latin1 characters
+      .replace(/\u00A0/g, ' ')
+      .replace(/[\u2022\u2023\u25E6\u2043]/g, '- ')
       .replace(/[^\x00-\xFF]/g, '');
     
     return cleaned;
   };
 
-  const escape = (str: string) => {
-    if (!str) return '';
-    const cleaned = cleanText(str);
-    return cleaned
-      .replace(/\\/g, '\\\\')
-      .replace(/\(/g, '\\(')
-      .replace(/\)/g, '\\)')
-      .replace(/\r/g, '')
-      .replace(/\n/g, ' ');
+  const pdfDoc = await PDFDocument.create();
+  const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  const timesRomanBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+  
+  const pageWidth = 595.28; // A4 width
+  const pageHeight = 841.89; // A4 height
+  const margin = 70;
+  const contentWidth = pageWidth - 2 * margin;
+  
+  let currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+  let yPosition = pageHeight - margin;
+  
+  const addNewPageIfNeeded = (requiredSpace: number) => {
+    if (yPosition - requiredSpace < margin + 100) {
+      currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+      yPosition = pageHeight - margin;
+      return true;
+    }
+    return false;
   };
-
-  const wrapText = (text: string, maxChars: number): string[] => {
-    if (!text) return [''];
+  
+  const drawText = (text: string, size: number, font: any, color = rgb(0, 0, 0)) => {
+    const lines = splitTextIntoLines(cleanText(text), contentWidth - 20, size, font);
+    
+    for (const line of lines) {
+      addNewPageIfNeeded(size + 5);
+      currentPage.drawText(line, {
+        x: margin,
+        y: yPosition,
+        size: size,
+        font: font,
+        color: color,
+      });
+      yPosition -= size + 5;
+    }
+  };
+  
+  const drawSection = (title: string, content: string) => {
+    addNewPageIfNeeded(40);
+    yPosition -= 10;
+    
+    currentPage.drawText(title, {
+      x: margin,
+      y: yPosition,
+      size: 14,
+      font: timesRomanBold,
+      color: rgb(0.17, 0.35, 0.63),
+    });
+    yPosition -= 25;
+    
+    drawText(content, 11, timesRomanFont);
+    yPosition -= 10;
+  };
+  
+  const splitTextIntoLines = (text: string, maxWidth: number, fontSize: number, font: any): string[] => {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
-
+    
     for (const word of words) {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
-      if (testLine.length > maxChars && currentLine) {
-        lines.push(escape(currentLine));
+      const width = font.widthOfTextAtSize(testLine, fontSize);
+      
+      if (width > maxWidth && currentLine) {
+        lines.push(currentLine);
         currentLine = word;
       } else {
         currentLine = testLine;
@@ -106,103 +144,150 @@ function generateProfessionalPDF(data: any): string {
     }
     
     if (currentLine) {
-      lines.push(escape(currentLine));
+      lines.push(currentLine);
     }
-
+    
     return lines;
   };
-
-  const addSection = (title: string, content: string, maxLines: number = 1000): string => {
-    const lines = wrapText(content, 85);
-    let section = `0 -30 Td\n/F2 14 Tf\n(${escape(title)}) Tj\n`;
-    section += `0 -20 Td\n/F1 10 Tf\n`;
-    
-    lines.slice(0, maxLines).forEach((line, index) => {
-      section += `(${line}) Tj\n0 -14 Td\n`;
-    });
-    
-    return section;
-  };
-
+  
   const currentDate = new Date().toLocaleDateString('pt-BR');
   
-  let contentStream = 'BT\n';
+  // Header
+  currentPage.drawText('PROPOSTA DE PROJETO', {
+    x: margin,
+    y: yPosition,
+    size: 24,
+    font: timesRomanBold,
+    color: rgb(0.1, 0.1, 0.1),
+  });
+  yPosition -= 35;
   
-  // Header with logo placeholder
-  contentStream += `/F2 28 Tf\n50 750 Td\n(PROPOSTA DE PROJETO) Tj\n`;
-  contentStream += `0 -30 Td\n/F1 12 Tf\n(${escape(data.organizationName || '')}) Tj\n`;
-  contentStream += `0 -16 Td\n(${escape(data.city || '')} - ${currentDate}) Tj\n`;
+  drawText(data.organizationName || '', 12, timesRomanFont, rgb(0.4, 0.4, 0.4));
+  drawText(`${data.city || ''} - ${currentDate}`, 10, timesRomanFont, rgb(0.4, 0.4, 0.4));
+  
+  yPosition -= 20;
   
   // Project Title
-  contentStream += `0 -40 Td\n/F2 20 Tf\n(${escape(data.nomeProjeto || 'Projeto')}) Tj\n`;
+  currentPage.drawText(data.nomeProjeto || 'Projeto', {
+    x: margin,
+    y: yPosition,
+    size: 18,
+    font: timesRomanBold,
+    color: rgb(0, 0, 0),
+  });
+  yPosition -= 30;
   
-  // Organization Info
-  contentStream += `0 -30 Td\n/F1 10 Tf\n(Organizacao: ${escape(data.organizationName || '')}) Tj\n`;
-  contentStream += `0 -14 Td\n(Tipo: ${escape(data.organizationType || '')}) Tj\n`;
-  contentStream += `0 -14 Td\n(Cidade: ${escape(data.city || '')}) Tj\n`;
+  // Organization Info Box
+  const boxHeight = 80;
+  addNewPageIfNeeded(boxHeight + 20);
   
-  // Executive Summary
-  contentStream += addSection('1. RESUMO EXECUTIVO', data.resumo || '');
+  currentPage.drawRectangle({
+    x: margin,
+    y: yPosition - boxHeight,
+    width: contentWidth,
+    height: boxHeight,
+    color: rgb(0.96, 0.96, 0.96),
+    borderColor: rgb(0.8, 0.8, 0.8),
+    borderWidth: 1,
+  });
   
-  // Justification
-  contentStream += addSection('2. JUSTIFICATIVA', data.justificativa || '');
+  yPosition -= 20;
+  currentPage.drawText(`Organização: ${data.organizationName || ''}`, {
+    x: margin + 15,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 20;
   
-  // Methodology
-  contentStream += addSection('3. METODOLOGIA', data.metodologia || '');
+  currentPage.drawText(`Tipo de Organização: ${data.organizationType || ''}`, {
+    x: margin + 15,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 20;
   
-  // Budget
-  contentStream += addSection('4. ORCAMENTO', data.orcamento || '');
+  currentPage.drawText(`Cidade de Implementação: ${data.city || ''}`, {
+    x: margin + 15,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 30;
   
-  // Eligibility Criteria (if exists)
+  // Sections
+  drawSection('1. RESUMO EXECUTIVO', data.resumo || '');
+  drawSection('2. JUSTIFICATIVA', data.justificativa || '');
+  drawSection('3. METODOLOGIA', data.metodologia || '');
+  drawSection('4. ORÇAMENTO', data.orcamento || '');
+  
   if (data.criteriosElegibilidade) {
-    contentStream += addSection('5. CRITERIOS DE ELEGIBILIDADE', data.criteriosElegibilidade);
+    drawSection('5. CRITÉRIOS DE ELEGIBILIDADE', data.criteriosElegibilidade);
   }
   
   // Signature Section
-  contentStream += `0 -60 Td\n/F2 12 Tf\n(ASSINATURAS) Tj\n`;
-  contentStream += `0 -40 Td\n/F1 10 Tf\n(_____________________________________________) Tj\n`;
-  contentStream += `0 -14 Td\n(Nome do Responsavel Legal) Tj\n`;
-  contentStream += `0 -14 Td\n(${escape(data.organizationName || '')}) Tj\n`;
-  contentStream += `0 -30 Td\n(_____________________________________________) Tj\n`;
-  contentStream += `0 -14 Td\n(Coordenador do Projeto) Tj\n`;
-  contentStream += `0 -30 Td\n(Data: ___/___/______) Tj\n`;
+  addNewPageIfNeeded(250);
+  yPosition -= 40;
   
-  contentStream += 'ET';
-
-  const streamLength = contentStream.length;
-
-  const pdf = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
-endobj
-4 0 obj
-<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> >> >>
-endobj
-5 0 obj
-<< /Length ${streamLength} >>
-stream
-${contentStream}
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-0000000380 00000 n 
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-${520 + streamLength}
-%%EOF`;
-
-  return pdf;
+  currentPage.drawText('ASSINATURAS', {
+    x: margin,
+    y: yPosition,
+    size: 14,
+    font: timesRomanBold,
+    color: rgb(0.17, 0.35, 0.63),
+  });
+  yPosition -= 50;
+  
+  // First signature line
+  currentPage.drawLine({
+    start: { x: margin + 100, y: yPosition },
+    end: { x: pageWidth - margin - 100, y: yPosition },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  yPosition -= 20;
+  
+  currentPage.drawText('Nome do Responsável Legal', {
+    x: margin + 150,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 15;
+  
+  currentPage.drawText(data.organizationName || '', {
+    x: margin + 150,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 50;
+  
+  // Second signature line
+  currentPage.drawLine({
+    start: { x: margin + 100, y: yPosition },
+    end: { x: pageWidth - margin - 100, y: yPosition },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  yPosition -= 20;
+  
+  currentPage.drawText('Coordenador do Projeto', {
+    x: margin + 160,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  yPosition -= 40;
+  
+  currentPage.drawText('Data: ___/___/______', {
+    x: margin + 180,
+    y: yPosition,
+    size: 10,
+    font: timesRomanFont,
+  });
+  
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes;
 }
