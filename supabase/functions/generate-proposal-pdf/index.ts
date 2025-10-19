@@ -93,7 +93,7 @@ async function generateProfessionalPDF(data: any): Promise<Uint8Array> {
     return false;
   };
   
-  const drawText = (text: string, size: number, font: any, color = rgb(0, 0, 0)) => {
+  const drawText = (text: string, size: number, font: any, color = rgb(0, 0, 0), justify = true) => {
     const normalized = cleanText(text ?? '');
     const paragraphs = normalized.split(/\r?\n+/).filter(Boolean);
 
@@ -103,15 +103,41 @@ async function generateProfessionalPDF(data: any): Promise<Uint8Array> {
 
     for (const para of paragraphs) {
       const lines = splitTextIntoLines(para, contentWidth - 20, size, font);
-      for (const line of lines) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const isLastLine = i === lines.length - 1;
+        
         addNewPageIfNeeded(size + 5);
-        currentPage.drawText(line, {
-          x: margin,
-          y: yPosition,
-          size,
-          font,
-          color,
-        });
+        
+        if (justify && !isLastLine && line.includes(' ')) {
+          // Calculate word spacing to justify the line
+          const words = line.split(' ');
+          const wordWidths = words.map(w => font.widthOfTextAtSize(w, size));
+          const totalWordWidth = wordWidths.reduce((sum, w) => sum + w, 0);
+          const availableSpace = contentWidth - 20 - totalWordWidth;
+          const gaps = words.length - 1;
+          const wordSpacing = gaps > 0 ? availableSpace / gaps : 0;
+          
+          let xPos = margin;
+          words.forEach((word, idx) => {
+            currentPage.drawText(word, {
+              x: xPos,
+              y: yPosition,
+              size,
+              font,
+              color,
+            });
+            xPos += font.widthOfTextAtSize(word, size) + wordSpacing;
+          });
+        } else {
+          currentPage.drawText(line, {
+            x: margin,
+            y: yPosition,
+            size,
+            font,
+            color,
+          });
+        }
         yPosition -= size + 5;
       }
       // Extra spacing between paragraphs
